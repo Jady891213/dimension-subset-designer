@@ -1,0 +1,5 @@
+{
+  "name": "PA Subset Editor",
+  "description": "A dimension subset editor inspired by IBM Planning Analytics",
+  "requestFramePermissions": []
+}
