@@ -6,7 +6,7 @@ import {
   Save, ArrowRight, ArrowLeft, ChevronsRight, ChevronsLeft,
   ArrowUp, ArrowDown, Trash2, CheckSquare, Square,
   FolderTree, Hash, Type, X, ChevronUp, Tag, ArrowDownAZ, ArrowUpZA, RotateCcw, Play,
-  History, Lock, Edit3, Check, ListTree, ListChecks, MoreHorizontal, Plus, Minus, Combine
+  History, Lock, Edit3, Check, ListTree, ListChecks, MoreHorizontal, Plus, Minus, Combine, ClipboardPaste
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -67,6 +67,7 @@ export default function SubsetEditor() {
   // Dialog State
   const [alertDialog, setAlertDialog] = useState({ isOpen: false, message: '' });
   const [customMdxDialog, setCustomMdxDialog] = useState<{ isOpen: boolean; mdx: string; editBlockId: string | null }>({ isOpen: false, mdx: '', editBlockId: null });
+  const [clipboardDialog, setClipboardDialog] = useState({ isOpen: false, text: '' });
 
   const maxLevel = useMemo(() => Math.max(...Object.values(mockElements).map(e => e.level)), []);
   const contextMenuRef = useRef<HTMLDivElement>(null);
@@ -922,6 +923,13 @@ export default function SubsetEditor() {
               <div className="flex items-center space-x-2">
                 <span className="text-[10px] text-gray-400">Select block to edit/prune</span>
                 <button 
+                  onClick={() => setClipboardDialog({ isOpen: true, text: '' })}
+                  className="p-1 bg-white border border-gray-300 rounded shadow-sm text-gray-600 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50 transition-colors"
+                  title="从剪切板导入"
+                >
+                  <ClipboardPaste size={14} />
+                </button>
+                <button 
                   onClick={() => {
                     setCustomMdxDialog({ isOpen: true, mdx: '', editBlockId: null });
                   }}
@@ -1054,6 +1062,67 @@ export default function SubsetEditor() {
                     }
                   }
                   setCustomMdxDialog({ isOpen: false, mdx: '', editBlockId: null });
+                }}
+                className="px-4 py-1.5 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 transition-colors"
+              >
+                确定
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Clipboard Import Dialog */}
+      {clipboardDialog.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm">
+          <div className="bg-white rounded-lg shadow-xl p-5 w-[500px] border border-gray-200 flex flex-col">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-base font-semibold text-gray-800">从剪切板导入</h3>
+              <button onClick={() => setClipboardDialog({ isOpen: false, text: '' })} className="text-gray-400 hover:text-gray-600">
+                <X size={16} />
+              </button>
+            </div>
+            <textarea 
+              className="w-full h-48 p-3 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none mb-4"
+              placeholder={`请按以下格式输入成员编码，多个成员使用逗号分隔，导入后将覆盖当前设置（可使用"复制到剪贴板"获取内容）\nUS,\nCanada,\nUK,\nChina`}
+              value={clipboardDialog.text}
+              onChange={(e) => setClipboardDialog(prev => ({ ...prev, text: e.target.value }))}
+              autoFocus
+            />
+            <div className="flex justify-end space-x-2">
+              <button 
+                onClick={() => setClipboardDialog({ isOpen: false, text: '' })}
+                className="px-4 py-1.5 bg-gray-100 text-gray-700 text-sm font-medium rounded hover:bg-gray-200 transition-colors"
+              >
+                取消
+              </button>
+              <button 
+                onClick={() => {
+                  if (clipboardDialog.text.trim()) {
+                    const members = clipboardDialog.text.split(',').map(s => s.trim()).filter(Boolean);
+                    const validMembers = members.filter(m => mockElements[m]);
+                    const invalidMembers = members.filter(m => !mockElements[m]);
+                    
+                    if (validMembers.length === 0) {
+                      setAlertDialog({ isOpen: true, message: '未找到任何有效的成员编码，请检查输入格式。' });
+                      return;
+                    }
+                    
+                    const mdx = `{ ${validMembers.map(m => `[Region].[${m}]`).join(', ')} }`;
+                    
+                    setExpressionBlocks([{
+                      id: Math.random().toString(36).substr(2, 9),
+                      type: 'Member',
+                      targetId: '',
+                      mdx: mdx,
+                      description: 'Imported from Clipboard'
+                    }]);
+                    
+                    if (invalidMembers.length > 0) {
+                      setAlertDialog({ isOpen: true, message: `成功导入 ${validMembers.length} 个成员。以下成员无效并被忽略：\n${invalidMembers.join(', ')}` });
+                    }
+                  }
+                  setClipboardDialog({ isOpen: false, text: '' });
                 }}
                 className="px-4 py-1.5 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 transition-colors"
               >
